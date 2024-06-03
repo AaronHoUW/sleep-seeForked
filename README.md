@@ -1,3 +1,6 @@
+# About this Repository
+<p>This repo is forked and a built on continuation of the original project by the main developer. This build includes refacotring of the code along adjust to the backend.</p>
+
 # About sleep&see
 <p>sleep&see is a web application that tracks users' sleep patterns and allows them to input sleep and wake times. By calculating sleep durations and giving affirming messages, users can gain insights into their sleep health. The application also features a resources page with research that highlight sleep-related statistics, infographics, and informative videos on how to promote better sleep health.</p>
 <p>Check out our website here: https://info442-christmas.web.app/</p>
