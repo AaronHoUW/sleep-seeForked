@@ -1,8 +1,6 @@
 /* This file contains the code login page */
-'use strict';
 import React from 'react';
 import { redirect } from 'react-router-dom';
-import { Navigate } from "react-router-dom";
 import StyledFireBaseAuth from 'react-firebaseui/StyledFirebaseAuth';
 import { getAuth, EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
 import Footer from "./Footer";

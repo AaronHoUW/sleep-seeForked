@@ -9,6 +9,12 @@ Thumbs.db# See https://help.github.com/articles/ignoring-files/ for more about i
 /node_modules
 /.pnp
 .pnp.js
+.env
+
+# firebase
+.firebase
+.firebaserc
+/firebase.json
 
 # testing
 /coverage

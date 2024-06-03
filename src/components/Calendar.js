@@ -1,9 +1,9 @@
-'use strict';
 import React, { useState, useEffect } from 'react';
 import blankData from '../data/blank-user.json'
 import Footer from "./Footer";
 import { get, getDatabase, ref, update, set } from 'firebase/database';
-import rocketImage from "../img/rocket.png"
+import monthDisplayText from '../data/monthDisplayText';
+import dayofWeekDisplay from '../data/dayofWeekDisplay';
 
 function Calendar(props) {
     // Calendar Values
@@ -68,10 +68,9 @@ function Calendar(props) {
     let weekCount = monthDetails[Object.keys(monthDetails).length - 1].week;
     // Create the display data of each week for given month.
     const handleCalenderWeek = [...Array(weekCount)].map((e, i) => <WeekCard loggedIn={props.loggedIn} setWeekRange={resetWeekRecap} user={user} userData={monthInfo} monthData={monthDetails} weekNum={i + 1} key={i}/>)
-    const monthDisplayText = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     // Switch calendar to the preivous month, if it's not January.
-    const handlePreviousMonth = (event) => {
+    const handleSwitchPreivousMonth = (event) => {
         if(calendarMonth > 1) {
             setCalendarMonth(calendarMonth - 1);
             resetWeekRecap()
@@ -79,7 +78,7 @@ function Calendar(props) {
     }
 
     // Switch calendar to the next month, if it's not December.
-    const handleNextMonth = (event) => {
+    const handleSwitchNextMonth = (event) => {
         if(calendarMonth < 12) {
             setCalendarMonth(calendarMonth + 1);
             resetWeekRecap()
@@ -95,11 +94,11 @@ function Calendar(props) {
                         {props.loggedIn && <h2 className='calendar-header'>Welcome, {user.displayName}</h2>}
                     </div>
                     <div className="col">
-                        <button onClick={handlePreviousMonth} type="button" className="btn btn-dark">{'<'}</button>
+                        <button onClick={handleSwitchPreivousMonth} type="button" className="btn btn-dark">{'<'}</button>
                     </div>
                     <div className="col calendar-month">{monthDisplayText[calendarMonth - 1]}</div>
                     <div className="col">
-                        <button onClick={handleNextMonth} type="button" className="btn btn-dark">{'>'}</button>
+                        <button onClick={handleSwitchNextMonth} type="button" className="btn btn-dark">{'>'}</button>
                     </div>
                 </div>
                 <div className="row calendar-days">
@@ -163,8 +162,6 @@ export function WeekRecap(props) {
         })
         selectWeek[i] = weekData;
     }
-
-    const dayofWeekDisplay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
     // Create a week selector
     const displaySelectGroup = Object.keys(selectWeek).map(element => {
@@ -180,23 +177,38 @@ export function WeekRecap(props) {
 
     // Change the average amount of sleep based on Week Selected
     const handleWeekChange = (event) => {
-        props.setSelectSummary(event.target.value)
-        let weekValue = parseInt(event.target.value)
+        const dateNotesData = grabLoggedData();
+        const sleepDataSum = calulateAverageSleep(dateNotesData)
+        setSummaryValues(sleepDataSum, dateNotesData.length);
 
-        const dateNotesData = []
-        Object.keys(props.userData.date).find(key => {
-            let data = props.userData.date[key];
-            if(weekValue === data.Week) {
-                dateNotesData.push(props.userData.date[key]);
-            }
-        })
+        function grabLoggedData() {
+            const weekValue = parseInt(event.target.value);
+            let loggedData = [];
+            Object.keys(props.userData.date).forEach(key => {
+                console.log(key)
+                let data = props.userData.date[key];
+                if(weekValue === data.Week) {
+                    loggedData.push(props.userData.date[key]);
+                }
+            })
+            // console.log("test return", Testing)
+            console.log("Logged Data", loggedData)
+            return loggedData;
+        }
 
-        let sleepDataSum = 0;
-        dateNotesData.forEach(element => {
-            sleepDataSum += grabDifferences(element.TimeSleep, element.TimeWakeUp);
-        })
+        function calulateAverageSleep(dateNotesData) {
+            let totalSleep = 0;
+            dateNotesData.forEach(element => {
+                totalSleep += grabDifferences(element.TimeSleep, element.TimeWakeUp);
+            })
+            return totalSleep;
+        }
 
-        props.setWeekRange(Math.round(sleepDataSum / dateNotesData.length * 10) / 10 || 0); //Set value based on averages or 0 if there's non
+
+        function setSummaryValues(sleepDataSum, totalDaysLogged) {
+            props.setSelectSummary(event.target.value)
+            props.setWeekRange(Math.round(sleepDataSum / totalDaysLogged * 10) / 10 || 0);
+        }
     }
 
     return (
@@ -287,8 +299,13 @@ export function WeekCard(props) {
     const filterWeek = props.monthData.filter((data) => {
         return data.week === props.weekNum;
     })
+    
     checkWeekData(filterWeek);
-    const displayWeek = filterWeek.map((data, i) => <DayCard loggedIn={props.loggedIn} setWeekRange={props.setWeekRange} user={props.user} userData={props.userData} dayInfo={data} key={i + data.date + "" + data.dayofWeek + "" + data.month}/>)
+    
+    const displayWeek = filterWeek.map((data, i) => {
+        return <DayCard loggedIn={props.loggedIn} setWeekRange={props.setWeekRange} user={props.user} userData={props.userData} dayInfo={data} key={i + "-" + data.date + "-" + data.dayofWeek + "-" + data.month + Date.now()}/>
+    })
+
     return (
         <div className="row">
                 {displayWeek}
@@ -318,7 +335,6 @@ function checkWeekData(data) {
 // creates the information for each date
 export function DayCard(props) {
     const [addNote, setAddNote] = useState('');
-    // User Wake up and Sleep UseState
     const [storedNotes, setStoredNotes] = useState([""]); // Users Notes Array UseState
     const [storedSleep, setStoredSleep] = useState('')
     const [storedWakeUp, setStoredWakeUp] = useState('')
@@ -328,22 +344,15 @@ export function DayCard(props) {
     const dayInfo = props.dayInfo
 
     useEffect(() => {
-        // Set stored values based on data found
         if(props.userData !== undefined) {
-            let userDateData = {};
-            Object.keys(props.userData.date).find(key => {
-                let data = props.userData.date[key];
-                if(data.DateNum === dayInfo.date && data.WeekdayNum === dayInfo.dayofWeek) {
-                    userDateData = props.userData.date[key];
-                }
-            }) 
+            let userDateData = grabUserDateData(props.userData.date, dayInfo);
             if(userDateData !== undefined) {    
                 setStoredSleep(userDateData.TimeSleep || "");
                 setStoredWakeUp(userDateData.TimeWakeUp || "");
                 setStoredNotes(userDateData.Notes || [""]);
             }
         }  
-    }, [])
+    }, [props.userData, dayInfo])
 
     const handleInputNote = (event) => {
         setAddNote(event.target.value);
@@ -357,32 +366,25 @@ export function DayCard(props) {
         setStoredWakeUp(event.target.value);
     }
 
-    const checkDataExist = () => {
-        let dateNotesData = {};
-        Object.keys(props.userData.date).find(key => {
-            let data = props.userData.date[key];
-            if(data.DateNum === dayInfo.date && data.WeekdayNum === dayInfo.dayofWeek) {
-                dateNotesData = props.userData.date[key];
-            }
-        }) 
-
-        let noteList = [...storedNotes];
-        if(addNote !== "") {
-            noteList = [...storedNotes, addNote]
-        }
-
+    const submitNewData = () => {
         const newDateInfo = {
             DateNum: dayInfo.date,
             WeekdayNum: dayInfo.dayofWeek,
             Week: dayInfo.week,
             TimeSleep: storedSleep,
             TimeWakeUp: storedWakeUp,
-            Notes: noteList,
+            Notes: checkNotesData(),
         }
         props.userData.date[dayInfo.date] = newDateInfo;
-        
-        // Push to Firebase
-        // If statment, if data exist, then update, else set new values
+
+        function checkNotesData() {
+            let noteList = [...storedNotes];
+            if(addNote !== "") {
+                noteList = [...storedNotes, addNote]
+            }
+            return noteList;
+        }
+
         if(props.loggedIn) {
             const db = getDatabase();
             const pathway = '/AllData/' + props.user.uid + '/month/' + (dayInfo.month - 1) + '/date/' + dayInfo.date;
@@ -391,7 +393,7 @@ export function DayCard(props) {
                     update(ref(db, pathway), {
                         TimeSleep: storedSleep,
                         TimeWakeUp: storedWakeUp,
-                        Notes: noteList,
+                        Notes: displayNotesList(),
                     })
                 } else {
                     set(ref(db, pathway), newDateInfo);
@@ -405,7 +407,7 @@ export function DayCard(props) {
     const handleSubmitNote = () => {
         if (addNote !== "") {
             setStoredNotes([...storedNotes, addNote]);
-            checkDataExist();
+            submitNewData();
             setAddNote('');
         } else {
             setNotesWarning(true);
@@ -416,62 +418,56 @@ export function DayCard(props) {
         if (storedSleep !== "" && storedWakeUp !== "") {
             setSuccessUpdate(true);
             props.setWeekRange(0);
-            checkDataExist();
+            submitNewData();
         } else {
             setTimeWarning(true)
         }
     }
 
+    const dateNotesData = grabUserDateData(props.userData.date, dayInfo)
+
     // have blank card if date doesn't exist
     if (dayInfo.date === '') {
         return <div className='col display-col'></div>
     }
-    let highlightToday = 'btn';
-    if (dayInfo.date === grabPresentDate().thisDate.getDate() &&
-        dayInfo.month === grabPresentDate().thisMonthNumber) {
-        highlightToday = highlightToday + ' border border-primary';
-    }
-
-    // Filter to get each date
-    let dateNoteList = <></>;
-
-    let dateNotesData = {};
-    Object.keys(props.userData.date).find(key => {
-        let data = props.userData.date[key];
-        if(data.DateNum === dayInfo.date && data.WeekdayNum === dayInfo.dayofWeek) {
-            dateNotesData = props.userData.date[key];
-        }
-    })
 
     // Return a list of notes if there's nots
-    if(dateNotesData.Notes !== undefined) {
-        dateNoteList = dateNotesData.Notes.map((note, i) => {
-            if(note !== '') {
-                return <DateNotes note={note} key={i}/>
-            }
-            return <></>;
-        })
+    function displayNotesList() {
+        let noteList = <></>;
+        if(dateNotesData.Notes !== undefined) {
+            noteList = dateNotesData.Notes.map((note, i) => {
+                if(note !== '') {
+                    return <DateNotes note={note} number={i} key={i + note + "-" + + Date.now()}/>
+                }
+                return <></>;
+            })
+        }
+        return noteList
     }
 
-    if(Object.keys(dateNotesData).length !== 0) {
-        const dateNoteList = dateNotesData.Notes.filter((note, i) => {
-            return note !== '';
-        })
-        if(dateNotesData.TimeSleep !== "" && dateNotesData.TimeWakeUp !== "") {
-            if (dayInfo.date === grabPresentDate().thisDate.getDate() && dayInfo.month === grabPresentDate().thisMonthNumber) {
-                highlightToday = highlightToday + " bg-primary text-white"
-            } else {
-                highlightToday = highlightToday + " bg-secondary text-white"
-            }
-        } 
-    }
+    function checkHighlightDate() {
+        let defineClassNames = 'btn';
+        
+        if (dayInfo.date === grabPresentDate().thisDate.getDate() &&
+            dayInfo.month === grabPresentDate().thisMonthNumber) {
+            defineClassNames = defineClassNames + ' border border-primary';
+        }
 
-    const monthDisplayText = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayofWeekDisplay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        if(Object.keys(dateNotesData).length !== 0) {
+            if(dateNotesData.TimeSleep !== "" && dateNotesData.TimeWakeUp !== "") {
+                if (dayInfo.date === grabPresentDate().thisDate.getDate() && dayInfo.month === grabPresentDate().thisMonthNumber) {
+                    defineClassNames = defineClassNames + " bg-primary text-white"
+                } else {
+                    defineClassNames = defineClassNames + " bg-secondary text-white"
+                }
+            } 
+        }
+        return defineClassNames;
+    }
 
     return (
         <div className='col display-col'>
-            <a className={highlightToday} data-bs-toggle="offcanvas" href={'#date-' + dayInfo.date + '-' + dayInfo.month} role="button" aria-controls="offcanvasExample">
+            <a className={checkHighlightDate()} data-bs-toggle="offcanvas" href={'#date-' + dayInfo.date + '-' + dayInfo.month} role="button" aria-controls="offcanvasExample">
                 {dayInfo.date}
             </a>
 
@@ -502,7 +498,7 @@ export function DayCard(props) {
                         <button type="button" className="ms-1 btn btn-outline-warning" onClick={() => setNotesWarning(false)}><strong>X</strong></button>
                     </div> }
                     <ul className="list-group">
-                        {dateNoteList}
+                        {displayNotesList()}
                         <li className="list-group-item">
                             <div className='input-group'>
                                 <input value={addNote} onChange={handleInputNote} type="text" className="form-control" placeholder="Add Notes" aria-label="text box" aria-describedby="basic-addon2" />
@@ -519,11 +515,23 @@ export function DayCard(props) {
 }
 
 export function DateNotes(props) {
+    console.log(props)
     return (
-        <li className="list-group-item">
+        <li className="list-group-item" key={props.note + props.number}>
             {props.note}
         </li>
     );
+}
+
+export function grabUserDateData(userDateData, dayInfo) {
+    let dateData = {};
+    Object.keys(userDateData).forEach(key => {
+        let data = userDateData[key];
+        if(data.DateNum === dayInfo.date && data.WeekdayNum === dayInfo.dayofWeek) {
+            dateData = userDateData[key];
+        }
+    }) 
+    return dateData;
 }
 
 export default Calendar;
