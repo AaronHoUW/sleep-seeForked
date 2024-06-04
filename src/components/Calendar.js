@@ -7,15 +7,18 @@ import dayofWeekDisplay from '../data/dayofWeekDisplay';
 
 function Calendar(props) {
     // Calendar Values
+    const [calendarYear, setCalendarYear] = useState(grabPresentDate().thisYearNumber)
     const [calendarMonth, setCalendarMonth] = useState(grabPresentDate().thisMonthNumber);
-    const days = daysInMonth(calendarMonth, grabPresentDate().thisYearNumber);
-    const monthDetails = datesDayMonth(days, calendarMonth);
+    const days = daysInMonth(calendarMonth, calendarYear);
+    const monthDetails = computeDatesIntoData(days, calendarMonth, calendarYear);
     // Setting Values for Weekly Summary
     const [selectSummary, setSelectSummary] = useState('0');
     const [weekRange, setWeekRange] = useState(0);
     // Assign Values
     const givenData = props.importData;
     const user = props.user;
+
+    console.log(calendarYear, calendarMonth, days)
 
     // Create a new dataset on firebase if it's a new User
     if(props.loggedIn) {
@@ -66,6 +69,7 @@ function Calendar(props) {
 
     // Grabs the amount of weeks in the given month
     let weekCount = monthDetails[Object.keys(monthDetails).length - 1].week;
+    console.log(weekCount)
     // Create the display data of each week for given month.
     const handleCalenderWeek = [...Array(weekCount)].map((e, i) => <WeekCard loggedIn={props.loggedIn} setWeekRange={resetWeekRecap} user={user} userData={monthInfo} monthData={monthDetails} weekNum={i + 1} key={i}/>)
 
@@ -73,16 +77,31 @@ function Calendar(props) {
     const handleSwitchPreivousMonth = (event) => {
         if(calendarMonth > 1) {
             setCalendarMonth(calendarMonth - 1);
-            resetWeekRecap()
+            
+        } else {
+            setCalendarMonth(12);
         }
+        resetWeekRecap()
     }
 
     // Switch calendar to the next month, if it's not December.
     const handleSwitchNextMonth = (event) => {
         if(calendarMonth < 12) {
             setCalendarMonth(calendarMonth + 1);
-            resetWeekRecap()
+        } else {
+            setCalendarMonth(1)
         }
+        resetWeekRecap()
+    }
+
+    const handleSwitchPreviousYear = (event) => {
+        setCalendarYear(calendarYear - 1)
+        resetWeekRecap()
+    }
+
+    const handleSwitchNextYear = () => {
+        setCalendarYear(calendarYear + 1)
+        resetWeekRecap()
     }
 
     return (
@@ -99,6 +118,13 @@ function Calendar(props) {
                     <div className="col calendar-month">{monthDisplayText[calendarMonth - 1]}</div>
                     <div className="col">
                         <button onClick={handleSwitchNextMonth} type="button" className="btn btn-dark">{'>'}</button>
+                    </div>
+                    <div className="col">
+                        <button onClick={handleSwitchPreviousYear} type="button" className="btn btn-dark">{'<'}</button>
+                    </div>
+                    <div className="col calendar-month">{calendarYear}</div>
+                    <div className="col">
+                        <button onClick={handleSwitchNextYear} type="button" className="btn btn-dark">{'>'}</button>
                     </div>
                 </div>
                 <div className="row calendar-days">
@@ -260,7 +286,7 @@ function daysInMonth(month, year) {
 }
 
 // Creating objects of each date containing year, date number, and month
-function datesDayMonth(day, givenMonth) {
+function computeDatesIntoData(day, givenMonth, givenYear) {
     // Creates each date of today's month into an object
     const dateData = [...Array(day)].map((e, i) => {
         // Adjust Month for date functio
@@ -274,7 +300,7 @@ function datesDayMonth(day, givenMonth) {
         if (givenMonth < 10) {
             adjustMonth = "0" + adjustMonth;
         }
-        let dayOfWeekNumber = new Date(grabPresentDate().thisYearNumber +  "-" + adjustMonth + "-" + adjustDate + "T12:00:00").getDay();
+        let dayOfWeekNumber = new Date(givenYear +  "-" + adjustMonth + "-" + adjustDate + "T12:00:00").getDay();
         const dayInfo = {
             date: (i + 1),
             dayofWeek: dayOfWeekNumber,
