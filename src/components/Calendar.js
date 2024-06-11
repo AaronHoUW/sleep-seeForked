@@ -18,8 +18,6 @@ function Calendar(props) {
     const givenData = props.importData;
     const user = props.user;
 
-    console.log(calendarYear, calendarMonth, days)
-
     // Create a new dataset on firebase if it's a new User
     if(props.loggedIn) {
         const db = getDatabase();
@@ -61,6 +59,8 @@ function Calendar(props) {
         })
     }
 
+    // console.log(monthInfo)
+
     // Callback function to reset values for Weekly Summary
     const resetWeekRecap = () => {
         setSelectSummary('0');
@@ -69,7 +69,6 @@ function Calendar(props) {
 
     // Grabs the amount of weeks in the given month
     let weekCount = monthDetails[Object.keys(monthDetails).length - 1].week;
-    console.log(weekCount)
     // Create the display data of each week for given month.
     const handleCalenderWeek = [...Array(weekCount)].map((e, i) => <WeekCard loggedIn={props.loggedIn} setWeekRange={resetWeekRecap} user={user} userData={monthInfo} monthData={monthDetails} weekNum={i + 1} key={i}/>)
 
@@ -138,7 +137,7 @@ function Calendar(props) {
                 </div>
                     {handleCalenderWeek}
                     <div><h1 className='summary-header'>Weekly Summary</h1></div>
-                    <WeekRecap weekRange={weekRange} setWeekRange={setWeekRange} setSelectSummary={setSelectSummary} selectSummary={selectSummary} monthDetails={monthDetails} weekCount={weekCount} userData={monthInfo}/>
+                    <WeekRecap weekRange={weekRange} setWeekRange={setWeekRange} setSelectSummary={setSelectSummary} selectSummary={selectSummary} monthDetails={monthDetails} weekCount={weekCount} userData={monthInfo} givenYear={calendarYear} />
             </div>
             <Footer/>
         </>
@@ -203,22 +202,24 @@ export function WeekRecap(props) {
 
     // Change the average amount of sleep based on Week Selected
     const handleWeekChange = (event) => {
-        const dateNotesData = grabLoggedData();
-        const sleepDataSum = calulateAverageSleep(dateNotesData)
-        setSummaryValues(sleepDataSum, dateNotesData.length);
+        if(props.userData[props.givenYear] === undefined) {
+            setSummaryValues(0, 0)
+        } else {
+            const dateNotesData = grabLoggedData();
+            const sleepDataSum = calulateAverageSleep(dateNotesData)
+            setSummaryValues(sleepDataSum, dateNotesData.length);
+        }
 
         function grabLoggedData() {
             const weekValue = parseInt(event.target.value);
+            const userFilterData = props.userData[props.givenYear]
             let loggedData = [];
-            Object.keys(props.userData.date).forEach(key => {
-                console.log(key)
-                let data = props.userData.date[key];
+            Object.keys(userFilterData).forEach(key => {
+                let data = userFilterData[key];
                 if(weekValue === data.Week) {
-                    loggedData.push(props.userData.date[key]);
+                    loggedData.push(userFilterData[key]);
                 }
             })
-            // console.log("test return", Testing)
-            console.log("Logged Data", loggedData)
             return loggedData;
         }
 
@@ -304,7 +305,8 @@ function computeDatesIntoData(day, givenMonth, givenYear) {
         const dayInfo = {
             date: (i + 1),
             dayofWeek: dayOfWeekNumber,
-            month: givenMonth
+            month: givenMonth,
+            year: givenYear
         }
         return dayInfo;
     })
@@ -370,15 +372,18 @@ export function DayCard(props) {
     const dayInfo = props.dayInfo
 
     useEffect(() => {
-        if(props.userData !== undefined) {
-            let userDateData = grabUserDateData(props.userData.date, dayInfo);
+        if(props.userData !== undefined && props.loggedIn) {
+            // console.log(props.userData)
+            let userDateData = grabUserDateData(props.userData[dayInfo.year], dayInfo);
             if(userDateData !== undefined) {    
                 setStoredSleep(userDateData.TimeSleep || "");
                 setStoredWakeUp(userDateData.TimeWakeUp || "");
                 setStoredNotes(userDateData.Notes || [""]);
             }
         }  
-    }, [props.userData, dayInfo])
+    }, [props.userData, dayInfo, props.loggedIn])
+
+    // console.log(props.userData)
 
     const handleInputNote = (event) => {
         setAddNote(event.target.value);
@@ -401,7 +406,17 @@ export function DayCard(props) {
             TimeWakeUp: storedWakeUp,
             Notes: checkNotesData(),
         }
-        props.userData.date[dayInfo.date] = newDateInfo;
+        // props.userData.date[dayInfo.date] = newDateInfo;
+        // Change grabPresentDate().thisYearNumber to Current Year that's Selected
+
+        if(props.userData[dayInfo.year] === undefined) {
+            props.userData[dayInfo.year] = {}
+        }
+        let tempUserData = props.userData[dayInfo.year]
+        tempUserData[dayInfo.date] = newDateInfo;
+
+
+
 
         function checkNotesData() {
             let noteList = [...storedNotes];
@@ -429,6 +444,7 @@ export function DayCard(props) {
             })
         }
     }
+    // console.log(props.userData)
 
     const handleSubmitNote = () => {
         if (addNote !== "") {
@@ -450,7 +466,7 @@ export function DayCard(props) {
         }
     }
 
-    const dateNotesData = grabUserDateData(props.userData.date, dayInfo)
+    const dateNotesData = grabUserDateData(props.userData[dayInfo.year], dayInfo)
 
     // have blank card if date doesn't exist
     if (dayInfo.date === '') {
@@ -471,17 +487,22 @@ export function DayCard(props) {
         return noteList
     }
 
+    function compareIntoToPresent(dayInfo) {
+        return dayInfo.date === grabPresentDate().thisDate.getDate() &&
+            dayInfo.month === grabPresentDate().thisMonthNumber &&
+            dayInfo.year === grabPresentDate().thisYearNumber;
+    }
+
     function checkHighlightDate() {
         let defineClassNames = 'btn';
-        
-        if (dayInfo.date === grabPresentDate().thisDate.getDate() &&
-            dayInfo.month === grabPresentDate().thisMonthNumber) {
+
+        if (compareIntoToPresent(dayInfo)) {
             defineClassNames = defineClassNames + ' border border-primary';
         }
 
         if(Object.keys(dateNotesData).length !== 0) {
             if(dateNotesData.TimeSleep !== "" && dateNotesData.TimeWakeUp !== "") {
-                if (dayInfo.date === grabPresentDate().thisDate.getDate() && dayInfo.month === grabPresentDate().thisMonthNumber) {
+                if (compareIntoToPresent(dayInfo)) {
                     defineClassNames = defineClassNames + " bg-primary text-white"
                 } else {
                     defineClassNames = defineClassNames + " bg-secondary text-white"
@@ -541,7 +562,6 @@ export function DayCard(props) {
 }
 
 export function DateNotes(props) {
-    console.log(props)
     return (
         <li className="list-group-item" key={props.note + props.number}>
             {props.note}
@@ -550,7 +570,11 @@ export function DateNotes(props) {
 }
 
 export function grabUserDateData(userDateData, dayInfo) {
+    if(userDateData === undefined) {
+        return {};
+    }
     let dateData = {};
+    // console.log(userDateData)
     Object.keys(userDateData).forEach(key => {
         let data = userDateData[key];
         if(data.DateNum === dayInfo.date && data.WeekdayNum === dayInfo.dayofWeek) {
